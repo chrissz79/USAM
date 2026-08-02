@@ -5,3 +5,6 @@ dist/
 .env
 .vscode/
 coverage/
+
+# Audio engine build output
+/audio/build/
