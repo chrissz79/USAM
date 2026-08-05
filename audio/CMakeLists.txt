@@ -109,4 +109,5 @@ target_sources(USAMUnitTests PRIVATE
     tests/SVFFilterTests.cpp
     tests/AdsrEnvelopeTests.cpp
     tests/VoiceManagerTests.cpp
+    tests/SynthVoiceTests.cpp
 )

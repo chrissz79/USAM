@@ -47,10 +47,16 @@ every stage of the production workflow into a single, database-driven ecosystem:
 
 | Pillar | Product class | Reference products |
 |---|---|---|
-| **Synthesizer** | Professional polyphonic hybrid synth | Serum 2, Omnisphere 2 |
-| **Sample Player** | Multi-sampled instrument player | Native Instruments Kontakt |
+| **Synthesizer** | Professional polyphonic hybrid synth | Serum 2, Omnisphere 2, Vital, Arturia Pigments, Zenology |
+| **Sample Player** | Multi-sampled instrument player | Native Instruments Kontakt 8 |
 | **Sampler** | Loop chopping / beat-making sampler | Serato Sample |
-| **Library Manager** | Universal sound-asset database & browser | Native Access, Komplete Kontrol, Basehead |
+| **Library Manager** | Universal sound-asset database & browser | Native Access, Komplete Kontrol, Basehead, Sononym |
+
+The library pillar spans every asset class the platform touches: samples (with
+Sononym-class similarity search and auto-analysis), presets/patches, multi-sampled
+instruments, sliced loops, installed plugins, and — longer term — the user's own
+creative projects that tie those assets together (which assets a track uses, so a
+project can be archived, moved, or reopened years later with everything resolvable).
 
 The core insight: **one database, one browser, one patch format, one engine**. Any sound asset —
 a wavetable, a multi-sampled piano, a sliced break — is *content* that flows through the same

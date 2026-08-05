@@ -6,31 +6,51 @@ namespace usam::dsp
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
+WavetableOscillator::WavetableOscillator()
+{
+    // Forces the shared tables to be built on the constructing (non-audio)
+    // thread, and guarantees `table` is never null.
+    updateTablePointer();
+}
+
 void WavetableOscillator::prepare (double newSampleRate)
 {
     sampleRate = newSampleRate > 0.0 ? newSampleRate : 44100.0;
     reset();
-    buildTable (waveform);
+
+    // Re-derive the mip level: the same frequency allows a different number
+    // of harmonics at a different sample rate.
+    if (frequency > 0.0f)
+        setFrequency (frequency);
 }
 
-void WavetableOscillator::setWaveform (Waveform newWaveform)
+void WavetableOscillator::setWaveform (Waveform newWaveform) noexcept
 {
-    waveform = newWaveform;
-    buildTable (waveform);
-}
+    if (newWaveform < Waveform::sine || newWaveform >= Waveform::count)
+        newWaveform = Waveform::sine;
 
-void WavetableOscillator::reset() noexcept
-{
-    phase = 0.0;
+    if (waveform != newWaveform)
+    {
+        waveform = newWaveform;
+        updateTablePointer();
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Parameter setters (audio-thread safe: only float/double writes)
+// Parameter setters (audio-thread safe: value writes and pointer swaps only)
 // ---------------------------------------------------------------------------
 void WavetableOscillator::setFrequency (float frequencyHz) noexcept
 {
+    frequency = frequencyHz;
     phaseIncrement = static_cast<double> (frequencyHz) * static_cast<double> (tableSize)
                      / sampleRate;
+
+    const int newLevel = mipLevelForFrequency (frequencyHz);
+    if (newLevel != mipLevel)
+    {
+        mipLevel = newLevel;
+        updateTablePointer();
+    }
 }
 
 void WavetableOscillator::setPhaseOffset (float phaseRadians) noexcept
@@ -44,43 +64,114 @@ void WavetableOscillator::setPhaseModulation (float phaseModRadiansPerSample) no
                * static_cast<float> (tableSize);
 }
 
-// ---------------------------------------------------------------------------
-// Table generation (UI thread)
-// ---------------------------------------------------------------------------
-void WavetableOscillator::buildTable (Waveform w)
+void WavetableOscillator::reset() noexcept
 {
-    for (int i = 0; i < tableSize; ++i)
+    phase = 0.0;
+}
+
+void WavetableOscillator::setPhase (float normalisedPhase) noexcept
+{
+    normalisedPhase -= std::floor (normalisedPhase); // wrap into 0..1
+    phase = static_cast<double> (normalisedPhase) * static_cast<double> (tableSize);
+}
+
+int WavetableOscillator::mipLevelForFrequency (float frequencyHz) const noexcept
+{
+    if (frequencyHz <= 0.0f)
+        return numMipLevels - 1; // no meaningful pitch: use the fullest table
+
+    const float allowedHarmonics = static_cast<float> (0.5 * sampleRate) / frequencyHz;
+    if (allowedHarmonics <= 1.0f)
+        return 0; // fundamental only
+
+    return juce::jlimit (0, numMipLevels - 1,
+                         static_cast<int> (std::log2 (allowedHarmonics)));
+}
+
+void WavetableOscillator::updateTablePointer() noexcept
+{
+    table = &getSharedTables().tables[static_cast<size_t> (waveform)]
+                                     [static_cast<size_t> (mipLevel)];
+}
+
+// ---------------------------------------------------------------------------
+// Table generation (once, on first construction — never on the audio thread
+// afterwards; the tables are immutable from then on)
+// ---------------------------------------------------------------------------
+namespace
+{
+    // Fourier-series amplitude of harmonic n for each waveform (0 when the
+    // waveform does not contain that harmonic). Overall scale is irrelevant —
+    // every table is peak-normalized after summation.
+    double harmonicAmplitude (WavetableOscillator::Waveform w, int n)
     {
-        const float t = static_cast<float> (i) / static_cast<float> (tableSize); // 0..1
-        const float phase = t * static_cast<float> (twoPi);
+        using Waveform = WavetableOscillator::Waveform;
 
         switch (w)
         {
             case Waveform::sine:
-                table[static_cast<size_t> (i)] = std::sin (phase);
-                break;
+                return n == 1 ? 1.0 : 0.0;
 
-            // Band-limited saw via parabolic approximation (polyBLEP-free cheap
-            // harmonic-richer variant). For M0 this is fine; polyBLEP comes in M1.
-            case Waveform::saw:
-                table[static_cast<size_t> (i)] = 2.0f * t - 1.0f;
-                break;
+            case Waveform::saw: // all harmonics, 1/n
+                return 1.0 / static_cast<double> (n);
 
-            case Waveform::square:
-                table[static_cast<size_t> (i)] = t < 0.5f ? 1.0f : -1.0f;
-                break;
+            case Waveform::square: // odd harmonics, 1/n
+                return n % 2 == 1 ? 1.0 / static_cast<double> (n) : 0.0;
 
-            case Waveform::triangle:
-                table[static_cast<size_t> (i)] = t < 0.5f
-                                                     ? 4.0f * t - 1.0f
-                                                     : 3.0f - 4.0f * t;
-                break;
+            case Waveform::triangle: // odd harmonics, 1/n^2, alternating sign
+                if (n % 2 == 0)
+                    return 0.0;
+                return (((n - 1) / 2) % 2 == 0 ? 1.0 : -1.0)
+                       / static_cast<double> (n) / static_cast<double> (n);
 
             default:
-                table[static_cast<size_t> (i)] = 0.0f;
-                break;
+                return 0.0;
         }
     }
+} // namespace
+
+WavetableOscillator::SharedTables::SharedTables()
+{
+    constexpr double twoPi = 6.28318530717958647692;
+
+    for (size_t w = 0; w < tables.size(); ++w)
+    {
+        for (int level = 0; level < numMipLevels; ++level)
+        {
+            const int maxHarmonic = 1 << level;
+            std::array<double, tableSize> acc{};
+
+            for (int n = 1; n <= maxHarmonic; ++n)
+            {
+                const double amplitude = harmonicAmplitude (static_cast<Waveform> (w), n);
+                if (amplitude == 0.0)
+                    continue;
+
+                for (int i = 0; i < tableSize; ++i)
+                    acc[static_cast<size_t> (i)] +=
+                        amplitude * std::sin (twoPi * n * i / static_cast<double> (tableSize));
+            }
+
+            // Peak-normalize so every (waveform, level) table spans ±1. This
+            // also absorbs the Fourier scale factors and keeps loudness
+            // consistent when the mip level changes with pitch.
+            double peak = 0.0;
+            for (const double v : acc)
+                peak = std::max (peak, std::abs (v));
+            const double scale = peak > 0.0 ? 1.0 / peak : 1.0;
+
+            auto& t = tables[w][static_cast<size_t> (level)];
+            for (int i = 0; i < tableSize; ++i)
+                t[static_cast<size_t> (i)] =
+                    static_cast<float> (acc[static_cast<size_t> (i)] * scale);
+        }
+    }
+}
+
+const WavetableOscillator::SharedTables& WavetableOscillator::getSharedTables()
+{
+    static const SharedTables sharedTables;
+    return sharedTables;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,8 +200,8 @@ float WavetableOscillator::getNextSample() noexcept
     const int index1 = (index0 + 1) % tableSize;
     const float frac = indexFloat - static_cast<float> (index0);
 
-    return table[static_cast<size_t> (index0)] * (1.0f - frac)
-           + table[static_cast<size_t> (index1)] * frac;
+    return (*table)[static_cast<size_t> (index0)] * (1.0f - frac)
+           + (*table)[static_cast<size_t> (index1)] * frac;
 }
 
 void WavetableOscillator::process (juce::AudioBuffer<float>& buffer, int startSample,

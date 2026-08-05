@@ -6,9 +6,9 @@ namespace usam
 PluginEditor::PluginEditor (PluginProcessor& p)
     : AudioProcessorEditor (&p), processor (p), voiceCountTimer (*this)
 {
-    setSize (640, 360);
+    setSize (600, 500);
 
-    titleLabel.setText ("USAM ENGINE — M0", juce::dontSendNotification);
+    titleLabel.setText ("USAM ENGINE — M1", juce::dontSendNotification);
     titleLabel.setFont (juce::Font (18.0f, juce::Font::bold));
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     addAndMakeVisible (titleLabel);
@@ -17,50 +17,92 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     voiceCountLabel.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
     addAndMakeVisible (voiceCountLabel);
 
-    auto makeCombo = [this] (juce::ComboBox& combo, const juce::StringArray& items)
-    {
-        combo.addItemList (items, 1);
-        addAndMakeVisible (combo);
-    };
+    const juce::StringArray waveformNames { "Sine", "Saw", "Square", "Triangle" };
 
-    auto makeSlider = [this] (juce::Slider& slider)
-    {
-        slider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
-        slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 18);
-        slider.setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xff4fc3f7));
-        slider.setColour (juce::Slider::textBoxTextColourId, juce::Colours::white);
-        slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        addAndMakeVisible (slider);
-    };
+    newRow(); // Osc 1
+    addCombo (ParamID::osc1Waveform, "Osc1 Wave", waveformNames);
+    addSlider (ParamID::osc1Coarse, "Coarse");
+    addSlider (ParamID::osc1Detune, "Detune");
+    addSlider (ParamID::osc1Level, "Level");
+    addSlider (ParamID::osc1Unison, "Unison");
+    addSlider (ParamID::osc1UnisonDetune, "Uni Det");
+    addSlider (ParamID::osc1UnisonSpread, "Spread");
 
-    makeCombo (oscWaveformCombo, { "Sine", "Saw", "Square", "Triangle" });
-    makeSlider (oscDetuneSlider);
-    makeSlider (oscLevelSlider);
-    makeCombo (filterTypeCombo, { "Lowpass", "Highpass", "Bandpass" });
-    makeSlider (filterCutoffSlider);
-    makeSlider (filterResSlider);
-    makeSlider (ampAttackSlider);
-    makeSlider (ampDecaySlider);
-    makeSlider (ampSustainSlider);
-    makeSlider (ampReleaseSlider);
-    makeSlider (masterGainSlider);
+    newRow(); // Osc 2
+    addCombo (ParamID::osc2Waveform, "Osc2 Wave", waveformNames);
+    addSlider (ParamID::osc2Coarse, "Coarse");
+    addSlider (ParamID::osc2Detune, "Detune");
+    addSlider (ParamID::osc2Level, "Level");
+    addSlider (ParamID::osc2Unison, "Unison");
+    addSlider (ParamID::osc2UnisonDetune, "Uni Det");
+    addSlider (ParamID::osc2UnisonSpread, "Spread");
 
-    // Bind to APVTS
-    auto& apvts = processor.getAPVTS();
-    oscWaveformAttachment = std::make_unique<ComboAttachment> (apvts, ParamID::oscWaveform, oscWaveformCombo);
-    oscDetuneAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::oscDetune, oscDetuneSlider);
-    oscLevelAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::oscLevel, oscLevelSlider);
-    filterTypeAttachment = std::make_unique<ComboAttachment> (apvts, ParamID::filterType, filterTypeCombo);
-    filterCutoffAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::filterCutoff, filterCutoffSlider);
-    filterResAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::filterResonance, filterResSlider);
-    ampAttackAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::ampAttack, ampAttackSlider);
-    ampDecayAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::ampDecay, ampDecaySlider);
-    ampSustainAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::ampSustain, ampSustainSlider);
-    ampReleaseAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::ampRelease, ampReleaseSlider);
-    masterGainAttachment = std::make_unique<SliderAttachment> (apvts, ParamID::masterGain, masterGainSlider);
+    newRow(); // Layers + filter
+    addSlider (ParamID::subLevel, "Sub");
+    addSlider (ParamID::noiseLevel, "Noise");
+    addCombo (ParamID::filterType, "Filter", { "Lowpass", "Highpass", "Bandpass" });
+    addSlider (ParamID::filterCutoff, "Cutoff");
+    addSlider (ParamID::filterResonance, "Res");
+
+    newRow(); // Amp env + master
+    addSlider (ParamID::ampAttack, "Attack");
+    addSlider (ParamID::ampDecay, "Decay");
+    addSlider (ParamID::ampSustain, "Sustain");
+    addSlider (ParamID::ampRelease, "Release");
+    addSlider (ParamID::masterGain, "Master");
 
     // Refresh voice count a few times per second (UI thread only).
     voiceCountTimer.startTimerHz (4);
+}
+
+PluginEditor::~PluginEditor() = default;
+
+void PluginEditor::newRow()
+{
+    rows.emplace_back();
+}
+
+void PluginEditor::attachLabel (juce::Component& target, const juce::String& text)
+{
+    auto label = std::make_unique<juce::Label>();
+    label->setText (text, juce::dontSendNotification);
+    label->setFont (juce::Font (12.0f));
+    label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+    label->setJustificationType (juce::Justification::centred);
+    label->attachToComponent (&target, false); // positions itself above target
+    addAndMakeVisible (*label);
+    labels.push_back (std::move (label));
+}
+
+void PluginEditor::addSlider (const juce::String& paramID, const juce::String& labelText)
+{
+    auto slider = std::make_unique<juce::Slider> (juce::Slider::RotaryVerticalDrag,
+                                                  juce::Slider::TextBoxBelow);
+    slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 16);
+    slider->setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xff4fc3f7));
+    slider->setColour (juce::Slider::textBoxTextColourId, juce::Colours::white);
+    slider->setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    addAndMakeVisible (*slider);
+    attachLabel (*slider, labelText);
+
+    sliderAttachments.push_back (std::make_unique<SliderAttachment> (processor.getAPVTS(),
+                                                                     paramID, *slider));
+    rows.back().push_back (slider.get());
+    sliders.push_back (std::move (slider));
+}
+
+void PluginEditor::addCombo (const juce::String& paramID, const juce::String& labelText,
+                             const juce::StringArray& items)
+{
+    auto combo = std::make_unique<juce::ComboBox>();
+    combo->addItemList (items, 1);
+    addAndMakeVisible (*combo);
+    attachLabel (*combo, labelText);
+
+    comboAttachments.push_back (std::make_unique<ComboAttachment> (processor.getAPVTS(),
+                                                                   paramID, *combo));
+    rows.back().push_back (combo.get());
+    combos.push_back (std::move (combo));
 }
 
 void PluginEditor::VoiceCountTimer::timerCallback()
@@ -68,8 +110,6 @@ void PluginEditor::VoiceCountTimer::timerCallback()
     owner.voiceCountLabel.setText ("voices: " + juce::String (owner.processor.getNumActiveVoices()),
                                    juce::dontSendNotification);
 }
-
-PluginEditor::~PluginEditor() = default;
 
 void PluginEditor::paint (juce::Graphics& g)
 {
@@ -82,34 +122,28 @@ void PluginEditor::resized()
 {
     auto bounds = getLocalBounds().reduced (12);
     titleLabel.setBounds (bounds.removeFromTop (24));
-    voiceCountLabel.setBounds (bounds.removeFromTop (16));
+    voiceCountLabel.setBounds (bounds.removeFromTop (14));
 
-    const int rowHeight = 92;
-    const int controlWidth = 68;
+    const int labelHeight = 16;   // attached labels sit above each control
+    const int controlHeight = 78;
+    const int controlWidth = 76;
+    const int gap = 6;
 
-    auto row1 = bounds.removeFromTop (rowHeight);
-    oscWaveformCombo.setBounds (row1.removeFromLeft (controlWidth));
-    row1.removeFromLeft (6);
-    oscDetuneSlider.setBounds (row1.removeFromLeft (controlWidth));
-    row1.removeFromLeft (6);
-    oscLevelSlider.setBounds (row1.removeFromLeft (controlWidth));
-    row1.removeFromLeft (6);
-    filterTypeCombo.setBounds (row1.removeFromLeft (controlWidth));
-    row1.removeFromLeft (6);
-    filterCutoffSlider.setBounds (row1.removeFromLeft (controlWidth));
-    row1.removeFromLeft (6);
-    filterResSlider.setBounds (row1.removeFromLeft (controlWidth));
+    for (auto& row : rows)
+    {
+        auto rowArea = bounds.removeFromTop (labelHeight + controlHeight);
+        rowArea.removeFromTop (labelHeight);
 
-    auto row2 = bounds.removeFromTop (rowHeight);
-    ampAttackSlider.setBounds (row2.removeFromLeft (controlWidth));
-    row2.removeFromLeft (6);
-    ampDecaySlider.setBounds (row2.removeFromLeft (controlWidth));
-    row2.removeFromLeft (6);
-    ampSustainSlider.setBounds (row2.removeFromLeft (controlWidth));
-    row2.removeFromLeft (6);
-    ampReleaseSlider.setBounds (row2.removeFromLeft (controlWidth));
-    row2.removeFromLeft (6);
-    masterGainSlider.setBounds (row2.removeFromLeft (controlWidth));
+        for (auto* component : row)
+        {
+            auto slot = rowArea.removeFromLeft (controlWidth);
+            // Combo boxes don't need the full rotary height.
+            if (dynamic_cast<juce::ComboBox*> (component) != nullptr)
+                slot = slot.withHeight (24).withY (slot.getY() + (controlHeight - 24) / 2);
+            component->setBounds (slot);
+            rowArea.removeFromLeft (gap);
+        }
+    }
 }
 
 } // namespace usam

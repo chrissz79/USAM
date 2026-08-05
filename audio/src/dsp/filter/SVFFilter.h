@@ -42,11 +42,17 @@ public:
     /** Sets cutoff (Hz) and resonance (Q). Smoothed internally. Audio thread safe. */
     void setParameters (float cutoffHz, float resonanceQ) noexcept;
 
-    /** Renders in place (single channel view of the buffer range). Audio thread. */
+    /** Renders in place. Mono buffers only: the parameter smoothers advance
+        per processed sample, so a second channel would see shifted
+        coefficients. Audio thread. */
     void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples) noexcept;
 
     /** In-place mono helper for per-voice rendering. Audio thread. */
     void processMono (float* data, int numSamples) noexcept;
+
+    /** In-place stereo pair: the smoothers advance once per sample and both
+        channels are filtered with identical coefficients. Audio thread. */
+    void processStereo (float* left, float* right, int numSamples) noexcept;
 
 private:
     juce::dsp::StateVariableTPTFilter<float> filter;

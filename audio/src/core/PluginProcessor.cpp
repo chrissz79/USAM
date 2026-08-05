@@ -14,8 +14,7 @@ PluginProcessor::PluginProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "Parameters", createParameterLayout())
 {
-    // Parameter defaults are defined in createParameterLayout(); they must mirror
-    // the SynthParameters defaults. Nothing extra to set here.
+    cacheParameterPointers();
 }
 
 PluginProcessor::~PluginProcessor() = default;
@@ -29,19 +28,53 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 
     AudioProcessorValueTreeState::ParameterLayout layout;
 
-    // Oscillator
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { ParamID::oscWaveform, 1 },
-                                                        "Osc Waveform",
-                                                        StringArray { "Sine", "Saw", "Square", "Triangle" },
-                                                        0));
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::oscDetune, 1 },
-                                                       "Osc Detune (cents)",
-                                                       NormalisableRange<float> (-1200.0f, 1200.0f, 0.1f),
-                                                       0.0f));
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::oscLevel, 1 },
-                                                       "Osc Level",
+    const StringArray waveformNames { "Sine", "Saw", "Square", "Triangle" };
+
+    // One oscillator's worth of parameters; osc1 is audible by default,
+    // osc2 fades in when the user raises its level.
+    auto addOscillator = [&layout, &waveformNames] (const String& prefix, const String& name,
+                                                    float defaultLevel)
+    {
+        layout.add (std::make_unique<AudioParameterChoice> (ParameterID { prefix + "Waveform", 1 },
+                                                            name + " Waveform", waveformNames, 0));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { prefix + "Coarse", 1 },
+                                                           name + " Coarse (semi)",
+                                                           NormalisableRange<float> (-24.0f, 24.0f, 1.0f),
+                                                           0.0f));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { prefix + "Detune", 1 },
+                                                           name + " Detune (cents)",
+                                                           NormalisableRange<float> (-100.0f, 100.0f, 0.1f),
+                                                           0.0f));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { prefix + "Level", 1 },
+                                                           name + " Level",
+                                                           NormalisableRange<float> (0.0f, 1.0f, 0.001f),
+                                                           defaultLevel));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { prefix + "Unison", 1 },
+                                                           name + " Unison",
+                                                           NormalisableRange<float> (1.0f, 16.0f, 1.0f),
+                                                           1.0f));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { prefix + "UnisonDetune", 1 },
+                                                           name + " Unison Detune (cents)",
+                                                           NormalisableRange<float> (0.0f, 100.0f, 0.1f, 0.5f),
+                                                           20.0f));
+        layout.add (std::make_unique<AudioParameterFloat> (ParameterID { prefix + "UnisonSpread", 1 },
+                                                           name + " Unison Spread",
+                                                           NormalisableRange<float> (0.0f, 1.0f, 0.001f),
+                                                           0.5f));
+    };
+
+    addOscillator ("osc1", "Osc 1", 0.8f);
+    addOscillator ("osc2", "Osc 2", 0.0f);
+
+    // Sub & noise layers
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::subLevel, 1 },
+                                                       "Sub Level",
                                                        NormalisableRange<float> (0.0f, 1.0f, 0.001f),
-                                                       0.8f));
+                                                       0.0f));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::noiseLevel, 1 },
+                                                       "Noise Level",
+                                                       NormalisableRange<float> (0.0f, 1.0f, 0.001f),
+                                                       0.0f));
 
     // Filter
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::filterCutoff, 1 },
@@ -84,13 +117,40 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     return layout;
 }
 
+void PluginProcessor::cacheParameterPointers()
+{
+    auto resolveOsc = [this] (const juce::String& prefix, OscParamRefs& refs)
+    {
+        refs.waveform = apvts.getRawParameterValue (prefix + "Waveform");
+        refs.coarse = apvts.getRawParameterValue (prefix + "Coarse");
+        refs.detune = apvts.getRawParameterValue (prefix + "Detune");
+        refs.level = apvts.getRawParameterValue (prefix + "Level");
+        refs.unison = apvts.getRawParameterValue (prefix + "Unison");
+        refs.unisonDetune = apvts.getRawParameterValue (prefix + "UnisonDetune");
+        refs.unisonSpread = apvts.getRawParameterValue (prefix + "UnisonSpread");
+    };
+
+    resolveOsc ("osc1", osc1Refs);
+    resolveOsc ("osc2", osc2Refs);
+
+    subLevelRef = apvts.getRawParameterValue (ParamID::subLevel);
+    noiseLevelRef = apvts.getRawParameterValue (ParamID::noiseLevel);
+    filterCutoffRef = apvts.getRawParameterValue (ParamID::filterCutoff);
+    filterResonanceRef = apvts.getRawParameterValue (ParamID::filterResonance);
+    filterTypeRef = apvts.getRawParameterValue (ParamID::filterType);
+    ampAttackRef = apvts.getRawParameterValue (ParamID::ampAttack);
+    ampDecayRef = apvts.getRawParameterValue (ParamID::ampDecay);
+    ampSustainRef = apvts.getRawParameterValue (ParamID::ampSustain);
+    ampReleaseRef = apvts.getRawParameterValue (ParamID::ampRelease);
+    masterGainRef = apvts.getRawParameterValue (ParamID::masterGain);
+}
+
 // ---------------------------------------------------------------------------
 // Audio lifecycle
 // ---------------------------------------------------------------------------
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     voiceManager.prepare (sampleRate, polyphony, samplesPerBlock);
-    params = SynthParameters{};
 }
 
 void PluginProcessor::releaseResources()
@@ -110,26 +170,35 @@ bool PluginProcessor::hasEditor() const
 // ---------------------------------------------------------------------------
 // Processing
 // ---------------------------------------------------------------------------
+void PluginProcessor::snapshotOsc (const OscParamRefs& refs, OscillatorParameters& out) noexcept
+{
+    out.waveform = static_cast<dsp::WavetableOscillator::Waveform> (
+        static_cast<int> (refs.waveform->load()));
+    out.coarseSemitones = refs.coarse->load();
+    out.detuneCents = refs.detune->load();
+    out.level = refs.level->load();
+    out.unisonVoices = static_cast<int> (refs.unison->load());
+    out.unisonDetuneCents = refs.unisonDetune->load();
+    out.unisonSpread = refs.unisonSpread->load();
+}
+
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
 
-    // Rebuild the parameter snapshot (reads APVTS — safe on the audio thread
-    // as long as we do not lock the value tree; JUCE parameter access is
-    // designed for this pattern). getRawParameterValue returns std::atomic,
-    // so use .load() (JUCE 9).
-    params.oscWaveform = static_cast<dsp::WavetableOscillator::Waveform> (
-        apvts.getRawParameterValue (ParamID::oscWaveform)->load());
-    params.oscDetune = apvts.getRawParameterValue (ParamID::oscDetune)->load();
-    params.oscLevel = apvts.getRawParameterValue (ParamID::oscLevel)->load();
-    params.filterCutoff = apvts.getRawParameterValue (ParamID::filterCutoff)->load();
-    params.filterResonance = apvts.getRawParameterValue (ParamID::filterResonance)->load();
-    params.filterType = static_cast<int> (apvts.getRawParameterValue (ParamID::filterType)->load());
-    params.ampAttack = apvts.getRawParameterValue (ParamID::ampAttack)->load();
-    params.ampDecay = apvts.getRawParameterValue (ParamID::ampDecay)->load();
-    params.ampSustain = apvts.getRawParameterValue (ParamID::ampSustain)->load();
-    params.ampRelease = apvts.getRawParameterValue (ParamID::ampRelease)->load();
-    params.masterGain = apvts.getRawParameterValue (ParamID::masterGain)->load();
+    // Rebuild the parameter snapshot from the cached atomics (lock-free).
+    snapshotOsc (osc1Refs, params.osc1);
+    snapshotOsc (osc2Refs, params.osc2);
+    params.subLevel = subLevelRef->load();
+    params.noiseLevel = noiseLevelRef->load();
+    params.filterCutoff = filterCutoffRef->load();
+    params.filterResonance = filterResonanceRef->load();
+    params.filterType = static_cast<int> (filterTypeRef->load());
+    params.ampAttack = ampAttackRef->load();
+    params.ampDecay = ampDecayRef->load();
+    params.ampSustain = ampSustainRef->load();
+    params.ampRelease = ampReleaseRef->load();
+    params.masterGain = masterGainRef->load();
 
     // MIDI -> voices
     for (const auto metadata : midiMessages)

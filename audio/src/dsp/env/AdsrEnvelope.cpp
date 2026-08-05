@@ -48,4 +48,14 @@ void AdsrEnvelope::applyEnvelopeToBuffer (float* data, int numSamples) noexcept
         data[i] *= adsr.getNextSample() * level;
 }
 
+void AdsrEnvelope::applyEnvelopeToStereo (float* left, float* right, int numSamples) noexcept
+{
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float gain = adsr.getNextSample() * level;
+        left[i] *= gain;
+        right[i] *= gain;
+    }
+}
+
 } // namespace usam::dsp

@@ -1,46 +1,60 @@
-# USAM - Universal Sound Asset Manager
+# USAM — Universal Sound Asset Manager
 
-USAM is een modulair platform voor het beheren, doorzoeken en organiseren van sound assets in moderne muziekproductie.
-Het richt zich op een database-gedreven desktopervaring voor producers, sound designers en studio-engineers die VST-plugins, samples, presets en sound libraries centraal willen beheren.
+USAM is an all-in-one music creation platform built around four pillars:
 
-## Missie
-USAM heeft als doel een future-proof asset management ecosysteem te bieden dat eenvoudig uitbreidbaar is naar meerdere formats, intelligente zoekfuncties en hardware-integratie.
+| Pillar | Product class | Status |
+|---|---|---|
+| **Synthesizer** | Professional polyphonic hybrid synth (Serum 2 / Omnisphere 2 / Vital / Pigments class) | 🚧 In development (M0 → M1) |
+| **Sample Player** | Multi-sampled instrument player (Kontakt 8 class) | Planned (M2) |
+| **Sampler** | Loop chopping / beat-making sampler (Serato Sample class) | Planned (M3) |
+| **Library Manager** | Sound-asset database & browser — samples, presets, instruments, plugins, projects (Sononym / Native Access class) | Planned (M4) |
 
-## Wat maakt USAM uniek?
-- **Modulair ontwerp:** elk onderdeel is losjes gekoppeld, zodat nieuwe assettypen en adapters later eenvoudig kunnen worden toegevoegd.
-- **Database-gedreven workflow:** alle assetmetadata wordt centraal opgeslagen in SQLite voor offline betrouwbaarheid en snelle zoekprestaties.
-- **Plugin-first MVP:** de eerste versie richt zich op VST-plugins met een solide scanner, browser en tag-based organisatie.
-- **AI-ready architectuur:** het systeem is ontworpen om later AI-assisted search en metadata-verrijking te ondersteunen.
+The core insight: **one database, one browser, one patch format, one engine.** Any sound
+asset — a wavetable, a multi-sampled piano, a sliced break — is content that flows through the
+same library, the same engine, and the same format.
 
-## Doelgroep
-- Muziekproducenten
-- Sound designers
-- Studio-engineers
-- Plugin-collectors
-- Componisten met grote sample- en presetbibliotheken
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and
+[ROADMAP.md](ROADMAP.md) for the milestone plan.
 
-## Kerncomponenten (MVP v0.1)
-- **VST Scanner:** detecteert en inventariseert lokale VST-plugins.
-- **SQLite Database:** slaat pluginmetadata, tags en scanresultaten op.
-- **Plugin Browser:** toont een overzicht van gevonden plugins met filters en metadata.
-- **Search Engine:** ondersteunt full-text zoekopdrachten over plugininformatie en tags.
-- **Tagging System:** biedt flexibele labeling en organisatie van assets.
+## Repository layout
 
-## Architectuurbenadering
-USAM is ontworpen als een cross-platform desktopapplicatie met een scheiding tussen:
-- **Frontend:** React-gebaseerde UI voor snelle browser- en zoekervaring.
-- **Backend:** Node.js services voor scanning, persistence en business logic.
-- **Database:** SQLite als lokale single source of truth.
+```
+usam/
+├── audio/            # JUCE C++ audio engine (current focus)
+│   ├── CMakeLists.txt
+│   ├── src/
+│   │   ├── core/     # plugin processor, parameters, voices, voice manager
+│   │   ├── dsp/      # oscillators, filters, envelopes
+│   │   └── gui/      # plugin editor
+│   └── tests/        # JUCE UnitTest-based DSP & engine tests
+├── ARCHITECTURE.md   # full platform architecture
+└── ROADMAP.md        # milestones M0–M5
+```
 
-## Releaseplanning
-- **MVP v0.1:** VST plugin discovery, browser, zoekfunctie en tagging.
-- **Beta v0.5:** toevoeging van samples, presets, library-adapters en AI-assisted search.
-- **Release v1.0:** volledige multi-asset ondersteuning, hardware foundation en productierijpe desktoprelease.
+The Electron/React library manager described in ARCHITECTURE.md §14 will be built in a later
+milestone (M4) under `manager/`; an earlier scaffold was removed to keep the repo focused on
+the engine.
 
-## Documentatie
-- `ARCHITECTURE.md` — beschrijft de architectuurprincipes en systeembouw.
-- `ROADMAP.md` — geeft de releaseplanning en versie-indeling weer.
-- `DATABASE_SCHEMA.md` — presenteert het relationele datamodel voor assets en zoekindexen.
+## Building the engine
 
-## Status
-Dit document geeft de definitie weer voor de eerste fase van USAM. De huidige focus is conceptueel en richt zich op het vastleggen van de architectuur en roadmap zonder broncodeimplementatie.
+Requirements: CMake ≥ 3.22 and a C++20 toolchain (Visual Studio 2022 on Windows, Xcode on
+macOS, GCC/Clang on Linux). JUCE 9 is fetched automatically via CMake `FetchContent`.
+
+```sh
+cmake -S audio -B audio/build
+cmake --build audio/build --config Release
+```
+
+This produces:
+
+- **USAM Engine** — VST3 plugin + Standalone app
+- **USAMUnitTests** — console unit-test runner
+
+## Running the tests
+
+```sh
+cmake --build audio/build --config Release --target USAMUnitTests
+./audio/build/USAMUnitTests_artefacts/Release/"USAM Unit Tests"
+```
+
+The runner exits non-zero on failure, so it can gate CI.

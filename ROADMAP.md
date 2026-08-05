@@ -1,84 +1,24 @@
 # USAM Roadmap
 
-Deze roadmap beschrijft de geplande uitrol van USAM van MVP tot productrelease, gebaseerd op de bestaande projectvisie en architectuurprincipes.
+USAM is built engine-first: the native JUCE synthesizer/sampler engine comes before the
+library manager, so every later pillar has a solid real-time foundation to plug into.
+Full details per milestone live in [ARCHITECTURE.md §24](ARCHITECTURE.md).
 
-## Visie
-USAM wil een modulair, database-gedreven assetbeheerplatform worden voor de muziekproductie-wereld.
-De focus ligt bij de eerste releases op VST-pluginbeheer, uitgebreide zoekmogelijkheden en flexibele tagging.
+| Phase | Scope | Exit criteria |
+|---|---|---|
+| **M0 — Foundation** ✅ | CMake/JUCE scaffold, plugin loads in a DAW, APVTS, voice manager, 1 wavetable osc + SVF + ADSR, basic patch save/load | Patch round-trips; 1 osc plays in a host |
+| **M1 — Synth core** 🚧 | 2 osc + sub/noise, unison, filter categories, 12 envelopes, 8 LFOs, mod matrix, arp, FX rack, plugin GUI v1 | Synth spec (§8) largely met; performance budgets (§18) met |
+| **M2 — Sampler engine** | Zones/groups/instruments, mapping editor, round-robin, velocity layers, disk streaming, USL runtime, `.usami` format | Kontakt-class instrument loads & plays; streaming budget met |
+| **M3 — Slicer** | Beat/transient detection, pads, keyboard mode, pitch/time, beatgrid, local stem separation | Serato-class slicing workflow in host |
+| **M4 — Manager & bridge** | Desktop manager app (Electron/React, rebuilt), bridge server, engine client, FTS5 + AI search | Library browse/tag/search works from inside the plugin |
+| **M5 — Polish & release** | Multi-part patches, hardware profiles, MPE, packaging, installers | v1.0 ships for VST3/AU/AAX + manager installers |
 
-## MVP v0.1
-### Doel
-Een betrouwbare basis leggen voor VST discovery, lokale metadata-opslag en efficiënte assetnavigatie.
+## Current focus (M0 → M1)
 
-### Scope
-- VST Scanner
-- SQLite Database
-- Plugin Browser
-- Search Engine
-- Tagging System
-
-### Kernfeatures
-- Detectie van VST-plugins op het lokale systeem.
-- Opslag van plugin metadata in een SQLite-database.
-- Een browserinterface voor het verkennen van gedetecteerde plugins.
-- Full-text search over plugin metadata en tags.
-- Flexibel tagbeheer voor custom organisatie en filtering.
-- Scan-sessies en statusinformatie voor reproduceerbare scans.
-
-### Succescriteria
-- Plugins worden consistent en betrouwbaar gescand.
-- Metadata wordt correct opgeslagen en kan worden opgehaald.
-- De gebruiker kan plugins zoeken, filteren en taggen.
-- UI en database blijven responsief bij realistische bibliotheken.
-
-## Beta v0.5
-### Doel
-Het platform uitbreiden naar meerdere assettypen, diepere metadata-workflows en betere zoek- en organisatiefunctionaliteit.
-
-### Scope
-- Sample Management
-- Preset Management
-- Support voor Kontakt, Falcon en HALion library adapters
-- Verbeterde search experience
-- Metadata import/export
-- Basis AI-assisted search capabilities
-
-### Kernfeatures
-- Browser voor samples en presets naast VST-plugins.
-- Library adapters voor populaire sound libraryformaten.
-- Uitgebreide filteropties op assettype, vendor, categorie en tags.
-- Geavanceerde zoekfunctionaliteit met ranking en suggesties.
-- Relaties tussen plugins, presets en libraries.
-- Basisniveau AI-assisted search of metadata-suggesties voor zoekopdrachten.
-
-### Succescriteria
-- Het systeem ondersteunt meerdere assettypen naast VST-plugins.
-- Zoekresultaten blijven snel en relevant na uitbreiding.
-- Gebruikers kunnen metadata en tags delen tussen assets.
-- De architectuur blijft modular en uitbreidbaar.
-
-## Release v1.0
-### Doel
-Een productierijpe release leveren met volledige multi-asset dekking en een foundation voor toekomstige hardware-integratie.
-
-### Scope
-- Volledige multi-format asset workflow
-- Productierijpe desktop packaging
-- Stabiliteit, performance en QA
-- Foundations voor toekomstige hardware-integratie
-
-### Kernfeatures
-- Volledige ondersteuning voor VST, samples, presets en library assets.
-- Geavanceerde tagging en organisatorische workflows.
-- Desktop packaging voor Windows, macOS en Linux.
-- Prestatieoptimalisatie en data-integriteit.
-- Basisarchitectuur voor hardware- en device-integratie.
-
-### Succescriteria
-- USAM is bruikbaar als end-to-end asset management oplossing.
-- De applicatie voldoet aan productiestandaarden voor stabiliteit en performance.
-- De architectuur biedt een solide basis voor toekomstige uitbreidingen.
-
-## Planning en verdere uitbreidingen
-- Na v1.0 wordt de roadmap uitgebreid met AI-assisted tagging, collaboratieve workflows en hardware-synchronisatie.
-- De modulaire architectuur maakt het mogelijk om later nieuwe assettypen en externe adapters toe te voegen zonder de kernopzet te wijzigen.
+- ✅ M0 hardening: parameter wiring, real-time safety, test coverage.
+- ✅ Band-limited oscillators (mipmapped wavetables, 11 mip levels, alias-free).
+- ✅ Dual oscillators + sub + noise layers; stereo voice path.
+- ✅ Unison: 1–16 voices per oscillator, symmetric detune, equal-power stereo
+  spread, phase fan-out at note start.
+- Next M1 bricks, in order: filter categories (more responses + drive),
+  LFOs, modulation matrix, FX rack, GUI v1.

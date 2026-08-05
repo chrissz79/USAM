@@ -39,6 +39,10 @@ public:
     /** Applies the envelope to a mono buffer (multiplies in place). Audio thread. */
     void applyEnvelopeToBuffer (float* data, int numSamples) noexcept;
 
+    /** Applies the envelope to a stereo pair, advancing the envelope once per
+        sample (both channels get the identical gain). Audio thread. */
+    void applyEnvelopeToStereo (float* left, float* right, int numSamples) noexcept;
+
 private:
     juce::ADSR adsr;
     float level = 1.0f; // velocity-scaled output level

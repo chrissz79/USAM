@@ -52,7 +52,35 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    // Raw atomics for every parameter, resolved once in the constructor so
+    // processBlock never does string lookups on the audio thread.
+    struct OscParamRefs
+    {
+        std::atomic<float>* waveform = nullptr;
+        std::atomic<float>* coarse = nullptr;
+        std::atomic<float>* detune = nullptr;
+        std::atomic<float>* level = nullptr;
+        std::atomic<float>* unison = nullptr;
+        std::atomic<float>* unisonDetune = nullptr;
+        std::atomic<float>* unisonSpread = nullptr;
+    };
+
+    void cacheParameterPointers();
+    void snapshotOsc (const OscParamRefs& refs, OscillatorParameters& out) noexcept;
+
     juce::AudioProcessorValueTreeState apvts;
+
+    OscParamRefs osc1Refs, osc2Refs;
+    std::atomic<float>* subLevelRef = nullptr;
+    std::atomic<float>* noiseLevelRef = nullptr;
+    std::atomic<float>* filterCutoffRef = nullptr;
+    std::atomic<float>* filterResonanceRef = nullptr;
+    std::atomic<float>* filterTypeRef = nullptr;
+    std::atomic<float>* ampAttackRef = nullptr;
+    std::atomic<float>* ampDecayRef = nullptr;
+    std::atomic<float>* ampSustainRef = nullptr;
+    std::atomic<float>* ampReleaseRef = nullptr;
+    std::atomic<float>* masterGainRef = nullptr;
 
     VoiceManager voiceManager;
     SynthParameters params;      // snapshot rebuilt from APVTS before each block

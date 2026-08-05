@@ -20,8 +20,8 @@ public:
         {
             juce::AudioBuffer<float> buffer (1, n);
             for (int i = 0; i < n; ++i)
-                buffer.setSample (0, i, std::sin (2.0 * juce::MathConstants<double>::pi
-                                                  * freq * i / sr));
+                buffer.setSample (0, i, static_cast<float> (
+                    std::sin (2.0 * juce::MathConstants<double>::pi * freq * i / sr)));
             return buffer;
         };
 
